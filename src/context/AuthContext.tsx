@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, signInWithGoogle, signOutUser, testConnection } from '../firebase';
+import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { auth, googleProvider, testConnection } from '../firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -37,12 +37,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const handleSignIn = async () => {
-    return await signInWithGoogle();
+  // Google Sign-In strictly using signInWithPopup without signInWithRedirect or navigation to /login
+  // Keeps the user on the current page after signing in
+  const handleSignIn = async (): Promise<User | null> => {
+    try {
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      return userCredential.user;
+    } catch (error: any) {
+      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+        console.info('Google Sign-In popup was closed by the user.');
+        return null;
+      }
+      console.error('Google Sign-In Error:', error);
+      throw error;
+    }
   };
 
-  const handleSignOut = async () => {
-    await signOutUser();
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Sign Out Error:', error);
+      throw error;
+    }
   };
 
   return (
