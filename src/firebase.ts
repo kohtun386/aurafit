@@ -1,12 +1,33 @@
 import { initializeApp } from 'firebase/app';
+import { getAnalytics } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, User } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+export const firebaseConfig = {
+  apiKey: "AIzaSyCMW5B0FkKQzfkE7J90lEfsDSwJVoOIIPU",
+  authDomain: "aurafit-784ad.firebaseapp.com",
+  projectId: "aurafit-784ad",
+  storageBucket: "aurafit-784ad.firebasestorage.app",
+  messagingSenderId: "201314906583",
+  appId: "1:201314906583:web:74d23edcb84cfef21c5b92",
+  measurementId: "G-85H1F2MT1J"
+};
 
-// Critical: Bind to specific database ID
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firebase
+export const app = initializeApp(firebaseConfig);
+export const analytics = typeof window !== 'undefined' ? (() => {
+  try {
+    return getAnalytics(app);
+  } catch (err) {
+    console.warn('Firebase analytics initialization skipped or unsupported:', err);
+    return null;
+  }
+})() : null;
+
+// Initialize Firestore & Auth services
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
