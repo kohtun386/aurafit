@@ -1,7 +1,8 @@
-import React from 'react';
-import { Activity, Flame, Shield, Globe, MessageSquare, ClipboardCheck, Dumbbell, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity, Flame, Shield, Globe, MessageSquare, ClipboardCheck, Dumbbell, User, LogIn, LogOut, Loader2 } from 'lucide-react';
 import { AthleteProfile, ActionableTodo } from '../types';
 import { UI_TRANSLATIONS } from '../data/mockData';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   activeTab: 'journal' | 'habits' | 'chat' | 'profile';
@@ -20,9 +21,23 @@ export const Header: React.FC<HeaderProps> = ({
   streakDays,
   onToggleLanguage,
 }) => {
+  const { user, signIn, signOut, loading: authLoading, isFirebaseConnected } = useAuth();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
   const lang = profile.preferredLanguage;
   const t = UI_TRANSLATIONS[lang];
   const pendingTodos = activeTodos.filter((t) => !t.completed).length;
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      await signIn();
+    } catch (err) {
+      console.error('Sign in failed:', err);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
 
   return (
     <header className="border-b border-slate-800/60 bg-[#05070A]/90 backdrop-blur-md sticky top-0 z-30">
@@ -41,6 +56,12 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="text-[10px] text-cyan-400 font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
                   CSCS AI
                 </span>
+                {isFirebaseConnected && (
+                  <span className="hidden lg:inline-flex items-center gap-1 text-[9px] font-mono text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Firestore Live
+                  </span>
+                )}
               </div>
               <p className="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em]">
                 Performance AI · v.2.4.0
@@ -48,25 +69,59 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Athlete Profile & Quick Controls */}
-          <div className="flex items-center gap-4 self-end sm:self-center">
-            {/* Athlete Profile Card */}
-            <div className="hidden md:flex flex-col text-right">
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">
-                Athlete Profile
-              </span>
-              <span className="text-sm font-medium text-slate-200">
-                {profile.name} <span className="text-slate-500 text-xs font-mono">({profile.trainingExperience === 'Advanced / Competitive Athlete' ? 'Pro' : 'Pro-Am'})</span>
-              </span>
-            </div>
-
-            {/* Live Telemetry Pulse Dot */}
-            <div className="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center justify-center shadow-inner" title="Live Coaching Telemetry Connected">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-            </div>
+          {/* Athlete Profile, Auth & Quick Controls */}
+          <div className="flex items-center flex-wrap gap-2.5 sm:gap-3 self-end sm:self-center">
+            {/* Auth Button / User Chip */}
+            {authLoading ? (
+              <div className="h-9 px-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs text-slate-400 font-mono">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+                <span>Auth...</span>
+              </div>
+            ) : user ? (
+              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || 'User'}
+                    className="w-6 h-6 rounded-full border border-cyan-500/40 object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[11px]">
+                    {(user.displayName || user.email || 'A')[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="text-slate-200 font-medium max-w-[100px] truncate hidden md:inline">
+                  {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}
+                </span>
+                <button
+                  id="sign-out-btn"
+                  onClick={signOut}
+                  title="Sign out of Firebase"
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                id="sign-in-google-btn"
+                onClick={handleGoogleSignIn}
+                disabled={isSigningIn}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/50 text-xs font-medium transition-all shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                title="Sign in with Google to sync journal & habits to Cloud Firestore"
+              >
+                {isSigningIn ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <LogIn className="h-3.5 w-3.5" />
+                )}
+                <span>{lang === 'my' ? 'Google ဖြင့် ဝင်မည်' : 'Sign In'}</span>
+              </button>
+            )}
 
             {/* Streak Pill */}
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono font-medium text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.15)]">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono font-medium text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.15)]">
               <Flame className="h-4 w-4 fill-amber-400/20 text-amber-400" />
               <span>{streakDays} {lang === 'my' ? 'ရက်' : 'D'}</span>
             </div>
@@ -75,11 +130,11 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="language-toggle-btn"
               onClick={onToggleLanguage}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 transition-colors"
               title="Switch between English and Myanmar"
             >
               <Globe className="h-3.5 w-3.5 text-cyan-400" />
-              <span>{lang === 'en' ? 'မြန်မာ' : 'English'}</span>
+              <span>{lang === 'en' ? 'မြန်မာ' : 'EN'}</span>
             </button>
           </div>
         </div>

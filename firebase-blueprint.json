@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Athlete profile parameters and preferences",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "primaryGoal": { "type": "string", "maxLength": 50 },
+        "trainingExperience": { "type": "string", "maxLength": 50 },
+        "bodyWeightKg": { "type": "number" },
+        "sportOrDiscipline": { "type": "string", "maxLength": 100 },
+        "injuryHistory": { "type": "string", "maxLength": 500 },
+        "preferredLanguage": { "type": "string", "enum": ["en", "my"] },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["userId", "name", "primaryGoal", "trainingExperience", "bodyWeightKg", "sportOrDiscipline", "preferredLanguage"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Daily athletic workout and recovery evaluation record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 32 },
+        "workoutType": { "type": "string", "maxLength": 100 },
+        "durationMinutes": { "type": "number" },
+        "rpe": { "type": "number" },
+        "volumeSummary": { "type": "string", "maxLength": 500 },
+        "sleepHours": { "type": "number" },
+        "sleepQuality": { "type": "string", "maxLength": 30 },
+        "sorenessLevel": { "type": "number" },
+        "soreMuscles": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 50 }
+        },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "evaluation": { "type": "object" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "date", "workoutType", "durationMinutes", "rpe", "sleepHours", "sleepQuality", "sorenessLevel"]
+    },
+    "RecoveryHabit": {
+      "title": "RecoveryHabit",
+      "description": "Actionable recovery to-do habit item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 50 },
+        "specifics": { "type": "string", "maxLength": 500 },
+        "timing": { "type": "string", "maxLength": 50 },
+        "completed": { "type": "boolean" },
+        "date": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "title", "category", "specifics", "timing", "completed"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Athlete consultation chat dialogue with AuraFit Coach",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string", "maxLength": 4000 },
+        "timestamp": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "role", "content", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Athlete profile document"
+    },
+    "/users/{userId}/journalEntries/{entryId}": {
+      "schema": "JournalEntry",
+      "description": "Athlete chronological workout and evaluation logs"
+    },
+    "/users/{userId}/habits/{habitId}": {
+      "schema": "RecoveryHabit",
+      "description": "Athlete actionable recovery habit checklist items"
+    },
+    "/users/{userId}/chatMessages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Athlete conversational coach message records"
+    }
+  }
+}

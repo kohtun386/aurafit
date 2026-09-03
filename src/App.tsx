@@ -18,8 +18,11 @@ import {
   INITIAL_JOURNAL_ENTRIES, 
   INITIAL_ACTIVE_TODOS 
 } from './data/mockData';
+import { useAuth } from './context/AuthContext';
+import { firestoreService } from './services/firestoreService';
 
 export default function App() {
+  const { user } = useAuth();
   // Persistent Athlete Profile
   const [profile, setProfile] = useState<AthleteProfile>(() => {
     try {
@@ -106,16 +109,84 @@ export default function App() {
     localStorage.setItem('aurafit_chat_messages', JSON.stringify(messages));
   }, [messages]);
 
+  // Firebase Firestore Real-Time Synchronization
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Sync or initialize Athlete Profile
+    firestoreService
+      .getProfile(user.uid)
+      .then((cloudProfile) => {
+        if (cloudProfile) {
+          setProfile(cloudProfile);
+        } else {
+          firestoreService.saveProfile(user.uid, profile).catch(console.error);
+        }
+      })
+      .catch(console.error);
+
+    // 2. Subscribe to Journal Entries
+    const unsubEntries = firestoreService.subscribeJournalEntries(user.uid, (entries) => {
+      if (entries.length > 0) {
+        setJournalEntries(entries);
+        if (entries[0]?.evaluation) {
+          setCurrentEvaluation(entries[0].evaluation);
+        }
+      } else if (journalEntries.length > 0) {
+        // Initial seeding for first login
+        journalEntries.forEach((entry) => {
+          firestoreService.saveJournalEntry(user.uid, entry).catch(console.error);
+        });
+      }
+    });
+
+    // 3. Subscribe to Actionable Habits
+    const unsubHabits = firestoreService.subscribeHabits(user.uid, (habits) => {
+      if (habits.length > 0) {
+        setActiveTodos(habits);
+      } else if (activeTodos.length > 0) {
+        activeTodos.forEach((habit) => {
+          firestoreService.saveHabit(user.uid, habit).catch(console.error);
+        });
+      }
+    });
+
+    // 4. Subscribe to Chat Messages
+    const unsubChat = firestoreService.subscribeChatMessages(user.uid, (cloudMsgs) => {
+      if (cloudMsgs.length > 0) {
+        setMessages(cloudMsgs);
+      } else if (messages.length > 0) {
+        messages.forEach((msg) => {
+          firestoreService.saveChatMessage(user.uid, msg).catch(console.error);
+        });
+      }
+    });
+
+    return () => {
+      unsubEntries();
+      unsubHabits();
+      unsubChat();
+    };
+  }, [user]);
+
   // Consistency Streak Calculation
   const streakDays = Math.max(3, activeTodos.filter((t) => t.completed).length + 2);
 
   // Toggle Language Handler
   const handleToggleLanguage = () => {
-    const nextLang = profile.preferredLanguage === 'en' ? 'my' : 'en';
-    setProfile((prev) => ({
-      ...prev,
-      preferredLanguage: nextLang,
-    }));
+    const nextLang: 'en' | 'my' = profile.preferredLanguage === 'en' ? 'my' : 'en';
+    const updated: AthleteProfile = { ...profile, preferredLanguage: nextLang };
+    setProfile(updated);
+    if (user) {
+      firestoreService.saveProfile(user.uid, updated).catch(console.error);
+    }
+  };
+
+  const handleUpdateProfile = (updated: AthleteProfile) => {
+    setProfile(updated);
+    if (user) {
+      firestoreService.saveProfile(user.uid, updated).catch(console.error);
+    }
   };
 
   // Submit Journal and Trigger AI Evaluation
@@ -181,6 +252,13 @@ export default function App() {
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, coachNotice]);
+
+      // Cloud Firestore Persistence
+      if (user) {
+        firestoreService.saveJournalEntry(user.uid, newEntry).catch(console.error);
+        newTodos.forEach((t) => firestoreService.saveHabit(user.uid, t).catch(console.error));
+        firestoreService.saveChatMessage(user.uid, coachNotice).catch(console.error);
+      }
     } catch (err: any) {
       console.error('Failed to evaluate journal:', err);
       // Fallback evaluation if offline/network hiccup occurs
@@ -242,6 +320,11 @@ export default function App() {
         date: entryData.date,
         habitsCount: fallbackTodos.length,
       });
+
+      if (user) {
+        firestoreService.saveJournalEntry(user.uid, fallbackEntry).catch(console.error);
+        fallbackTodos.forEach((t) => firestoreService.saveHabit(user.uid, t).catch(console.error));
+      }
     } finally {
       setIsEvaluating(false);
     }
@@ -257,10 +340,17 @@ export default function App() {
     }));
     setActiveTodos((prev) => [...newItems, ...prev]);
     setHabitsAdopted(true);
+    if (user) {
+      newItems.forEach((t) => firestoreService.saveHabit(user.uid, t).catch(console.error));
+    }
   };
 
   // Toggle single todo status
   const handleToggleTodo = (id: string) => {
+    const target = activeTodos.find((t) => t.id === id);
+    if (target && user) {
+      firestoreService.updateHabitStatus(user.uid, id, !target.completed).catch(console.error);
+    }
     setActiveTodos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
     );
@@ -274,11 +364,17 @@ export default function App() {
       completed: false,
     };
     setActiveTodos((prev) => [newTodo, ...prev]);
+    if (user) {
+      firestoreService.saveHabit(user.uid, newTodo).catch(console.error);
+    }
   };
 
   // Delete habit
   const handleDeleteTodo = (id: string) => {
     setActiveTodos((prev) => prev.filter((t) => t.id !== id));
+    if (user) {
+      firestoreService.deleteHabit(user.uid, id).catch(console.error);
+    }
   };
 
   // Conversational Coaching Send Message
@@ -291,6 +387,9 @@ export default function App() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    if (user) {
+      firestoreService.saveChatMessage(user.uid, userMessage).catch(console.error);
+    }
     setIsChatLoading(true);
 
     try {
@@ -323,6 +422,9 @@ export default function App() {
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, coachMessage]);
+      if (user) {
+        firestoreService.saveChatMessage(user.uid, coachMessage).catch(console.error);
+      }
     } catch (err: any) {
       console.error('Chat error:', err);
       // Scientific and grounded fallback reply
@@ -330,15 +432,16 @@ export default function App() {
         ? `ကျွန်ုပ်၏ အကြံပြုချက်:\n\n1. **အနားယူခြင်းနှင့် အကြောလျှော့ခြင်း:** ကြွက်သားကိုက်ခဲမှု သို့မဟုတ် တင်းကျပ်မှုအတွက် 90/90 Hip Mobility (၂ ကြိမ် x ၆၀ စက္ကန့်) ပြုလုပ်ပါ။\n2. **ရေဓာတ် ပြည့်ဝစေရန်:** ရေ 3.2L နှင့် Electrolyte (ဆိုဒီယမ် 400mg) သောက်ပါ။\n3. **ဒဏ်ရာ ကာကွယ်ရေး:** နာကျင်မှု အဆင့် ၄ သို့မဟုတ် ၅ ဖြစ်ပါက နောက်လေ့ကျင့်ခန်းတွင် အလေးချိန် ၃၀% လျှော့ချပါ (Deload)။`
         : `Here is the specific clinical prescription based on your current recovery profile:\n\n1. **Active Mobility:** Perform 2 sets of 60-second 90/90 hip switches and 3 sets of 45-second dead hangs for spinal decompression.\n2. **Electrolyte & Hydration Protocol:** Ingest 3.2 Liters of fluids with 400-500mg sodium to optimize intracellular pressure.\n3. **Load Management:** If soreness remains at or above level 3, cap your training intensity at RPE 6-7 to protect tendon viscoelasticity.`;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg-${Date.now()}-reply`,
-          role: 'assistant',
-          content: fallbackReply,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      const fallbackMsg: ChatMessage = {
+        id: `msg-${Date.now()}-reply`,
+        role: 'assistant',
+        content: fallbackReply,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
+      if (user) {
+        firestoreService.saveChatMessage(user.uid, fallbackMsg).catch(console.error);
+      }
     } finally {
       setIsChatLoading(false);
     }
@@ -458,7 +561,7 @@ export default function App() {
         {activeTab === 'profile' && (
           <ProfileAndLogs
             profile={profile}
-            onUpdateProfile={setProfile}
+            onUpdateProfile={handleUpdateProfile}
             journalEntries={journalEntries}
           />
         )}

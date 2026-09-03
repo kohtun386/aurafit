@@ -78,6 +78,24 @@ service cloud.firestore {
    npm start
    ```
 
+5. **Deploy with Docker to Google Cloud Run:**
+   ```bash
+   # Build the container image
+   docker build -t gcr.io/YOUR_PROJECT_ID/aurafit-coach:latest .
+
+   # Run locally on port 8080
+   docker run -p 8080:8080 -e GEMINI_API_KEY="YOUR_KEY" gcr.io/YOUR_PROJECT_ID/aurafit-coach:latest
+
+   # Deploy directly to Google Cloud Run
+   gcloud run deploy aurafit-coach \
+     --image gcr.io/YOUR_PROJECT_ID/aurafit-coach:latest \
+     --platform managed \
+     --region us-central1 \
+     --allow-unauthenticated \
+     --set-labels dev-tutorial=cloud-run-ai-challenge \
+     --set-env-vars GEMINI_API_KEY="YOUR_KEY"
+   ```
+
 ---
 
 ## 🏅 Ideathon Challenge Details

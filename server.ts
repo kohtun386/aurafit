@@ -7,7 +7,12 @@ import { createServer as createViteServer } from 'vite';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+// Google Cloud Run uses process.env.PORT || 8080; AI Studio local dev proxy requires port 3000
+const PORT: number = Number(
+  process.env.NODE_ENV === 'production'
+    ? (process.env.PORT || 8080)
+    : (process.env.DEFAULT_APP_PORT || 3000)
+);
 
 app.use(express.json({ limit: '10mb' }));
 
