@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { 
+  User, 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  signOut 
+} from 'firebase/auth';
 import { auth, googleProvider, testConnection } from '../firebase';
 
 interface AuthContextType {
@@ -24,10 +31,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
 
   useEffect(() => {
-    // Initial connection validation per Firebase skill
+    // Initial connection validation
     testConnection().then((connected) => {
       setIsFirebaseConnected(connected);
     });
+
+    // Check for redirect result from Google OAuth
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((error) => {
+        console.error('Google Redirect Sign-In Error:', error);
+      });
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -37,16 +55,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Google Sign-In strictly using signInWithPopup without signInWithRedirect or navigation to /login
-  // Keeps the user on the current page after signing in
+  // Google Sign-In with Popup first, falling back to Redirect for strict cross-origin browser policies
   const handleSignIn = async (): Promise<User | null> => {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
       return userCredential.user;
     } catch (error: any) {
-      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
-        console.info('Google Sign-In popup was closed by the user.');
-        return null;
+      console.warn('Popup sign-in encountered an issue, attempting redirect fallback...', error?.code || error);
+      if (
+        error?.code === 'auth/popup-blocked' ||
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/internal-error'
+      ) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return null;
+        } catch (redirectErr) {
+          console.error('Redirect Sign-In Error:', redirectErr);
+          throw redirectErr;
+        }
       }
       console.error('Google Sign-In Error:', error);
       throw error;
