@@ -17,6 +17,9 @@ const PORT: number = Number(
 
 app.use(express.json({ limit: '10mb' }));
 
+// Trust Google Cloud Run front-end proxy headers for accurate client IP rate limiting
+app.set('trust proxy', 1);
+
 // Rate Limiters to prevent quota depletion and automated API abuse
 const evaluateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
