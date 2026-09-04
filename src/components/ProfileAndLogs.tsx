@@ -10,7 +10,8 @@ import {
   Flame, 
   Moon, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp,
+  Trash2
 } from 'lucide-react';
 import { AthleteProfile, JournalEntry } from '../types';
 import { UI_TRANSLATIONS } from '../data/mockData';
@@ -20,6 +21,7 @@ interface ProfileAndLogsProps {
   onUpdateProfile: (updated: AthleteProfile) => void;
   journalEntries: JournalEntry[];
   onSelectEntryForViewing?: (entry: JournalEntry) => void;
+  onDeleteEntry?: (id: string) => void;
 }
 
 export const ProfileAndLogs: React.FC<ProfileAndLogsProps> = ({
@@ -27,6 +29,7 @@ export const ProfileAndLogs: React.FC<ProfileAndLogsProps> = ({
   onUpdateProfile,
   journalEntries,
   onSelectEntryForViewing,
+  onDeleteEntry,
 }) => {
   const lang = profile.preferredLanguage;
   const t = UI_TRANSLATIONS[lang];
@@ -307,6 +310,25 @@ export const ProfileAndLogs: React.FC<ProfileAndLogsProps> = ({
                           </span>
                         </div>
                         <p className="italic text-slate-200">"{entry.evaluation.coachSummary}"</p>
+                      </div>
+                    )}
+
+                    {onDeleteEntry && (
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(lang === 'my' ? 'ဤမှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?' : 'Are you sure you want to delete this log entry?')) {
+                              onDeleteEntry(entry.id);
+                            }
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+                          title="Delete this training log"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>{lang === 'my' ? 'မှတ်တမ်းဖျက်မည်' : 'Delete Log'}</span>
+                        </button>
                       </div>
                     )}
                   </div>

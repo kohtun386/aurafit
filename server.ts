@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
@@ -15,6 +16,23 @@ const PORT: number = Number(
 );
 
 app.use(express.json({ limit: '10mb' }));
+
+// Rate Limiters to prevent quota depletion and automated API abuse
+const evaluateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // Limit each IP to 30 journal evaluations per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many evaluation requests from this IP. Please wait a few minutes.' },
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Limit each IP to 50 coaching chats per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many chat messages from this IP. Please wait a moment before sending more.' },
+});
 
 // Lazy getter for Google GenAI client
 let genAIClient: GoogleGenAI | null = null;
@@ -47,12 +65,31 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Daily Journal Evaluation Endpoint
-app.post('/api/coach/evaluate', async (req, res) => {
+app.post('/api/coach/evaluate', evaluateLimiter, async (req, res) => {
   try {
     const { entry, profile, recentLogs, language = 'en' } = req.body;
 
-    if (!entry) {
-      return res.status(400).json({ error: 'Missing journal entry data' });
+    if (!entry || typeof entry !== 'object') {
+      return res.status(400).json({ error: 'Valid journal entry data is required' });
+    }
+
+    // Numerical range validation
+    const duration = Number(entry.durationMinutes);
+    const rpe = Number(entry.rpe);
+    const sleep = Number(entry.sleepHours);
+    const soreness = Number(entry.sorenessLevel);
+
+    if (isNaN(duration) || duration < 0 || duration > 1440) {
+      return res.status(400).json({ error: 'Duration must be between 0 and 1440 minutes' });
+    }
+    if (isNaN(rpe) || rpe < 1 || rpe > 10) {
+      return res.status(400).json({ error: 'RPE must be between 1 and 10' });
+    }
+    if (isNaN(sleep) || sleep < 0 || sleep > 24) {
+      return res.status(400).json({ error: 'Sleep duration must be between 0 and 24 hours' });
+    }
+    if (isNaN(soreness) || soreness < 1 || soreness > 5) {
+      return res.status(400).json({ error: 'Soreness level must be between 1 and 5' });
     }
 
     const ai = getGenAI();
@@ -237,12 +274,16 @@ Analyze this entry comprehensively. Return structured JSON matching the schema.`
 });
 
 // Conversational Coaching Chat Endpoint
-app.post('/api/coach/chat', async (req, res) => {
+app.post('/api/coach/chat', chatLimiter, async (req, res) => {
   try {
     const { messages, athleteContext, language = 'en' } = req.body;
 
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Messages array is required' });
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Non-empty messages array is required' });
+    }
+
+    if (messages.length > 60) {
+      return res.status(400).json({ error: 'Message history exceeds maximum limit (60 messages)' });
     }
 
     const ai = getGenAI();

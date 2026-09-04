@@ -8,7 +8,9 @@ import {
   Activity, 
   AlertCircle, 
   Zap, 
-  RefreshCw 
+  RefreshCw,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { ChatMessage, AthleteProfile, JournalEntry, ActionableTodo } from '../types';
@@ -37,11 +39,51 @@ export const CoachChat: React.FC<CoachChatProps> = ({
   const t = UI_TRANSLATIONS[lang];
 
   const [inputMessage, setInputMessage] = useState('');
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleToggleSpeech = (msgId: string, text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    if (speakingMessageId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    // Clean markdown symbols for natural speech synthesis
+    const cleanText = text
+      .replace(/[*_#`~\[\]\(\)]/g, '')
+      .replace(/- /g, '')
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+    };
+    utterance.onerror = () => {
+      setSpeakingMessageId(null);
+    };
+
+    setSpeakingMessageId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,11 +189,33 @@ export const CoachChat: React.FC<CoachChatProps> = ({
                   </div>
                 )}
                 <div
-                  className={`text-[10px] mt-1.5 font-mono ${
-                    isUser ? 'text-slate-900/70 text-right' : 'text-slate-500'
+                  className={`text-[10px] mt-2 font-mono flex items-center justify-between gap-3 ${
+                    isUser ? 'text-slate-900/70 text-right justify-end' : 'text-slate-400'
                   }`}
                 >
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {!isUser && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSpeech(msg.id, msg.content)}
+                      className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-sans transition-colors cursor-pointer py-0.5"
+                      title={speakingMessageId === msg.id ? 'Stop audio' : 'Listen to Coach audio voice'}
+                    >
+                      {speakingMessageId === msg.id ? (
+                        <>
+                          <VolumeX className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                          <span className="text-amber-400 font-medium">Stop Audio</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-3.5 w-3.5" />
+                          <span>Voice Readout</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <span>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               </div>
             </div>

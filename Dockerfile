@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Install dependencies using package-lock.json for reproducible builds
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy application source code and configuration files
 COPY . .
@@ -34,7 +34,7 @@ RUN groupadd -r aurafit && useradd -r -g aurafit -m aurafit
 
 # Copy package manifests and install only production dependencies
 COPY package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy pre-compiled production bundle (client assets + bundled server.cjs)
 COPY --from=builder /app/dist ./dist

@@ -1,8 +1,1 @@
-{
-  "name": "AuraFit Coach",
-  "description": "Elite AI athletic performance specialist, strength & conditioning coach, and exercise physiologist for recovery, injury prevention, and daily habit consistency.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
+{"name":"AuraFit Coach","description":"Elite AI athletic performance specialist, strength \u0026 conditioning coach, and exercise physiologist for recovery, injury prevention, and daily habit consistency.","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}

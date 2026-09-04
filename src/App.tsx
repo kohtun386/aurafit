@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import { Header } from './components/Header';
 import { DailyJournalForm } from './components/DailyJournalForm';
@@ -6,6 +6,7 @@ import { EvaluationCard } from './components/EvaluationCard';
 import { ActionableHabitsTracker } from './components/ActionableHabitsTracker';
 import { CoachChat } from './components/CoachChat';
 import { ProfileAndLogs } from './components/ProfileAndLogs';
+import { LandingPage } from './components/LandingPage';
 import { 
   AthleteProfile, 
   JournalEntry, 
@@ -22,7 +23,10 @@ import { useAuth } from './context/AuthContext';
 import { firestoreService } from './services/firestoreService';
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading: authLoading, signIn } = useAuth();
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
+    return localStorage.getItem('aurafit_guest_mode') === 'true';
+  });
   // Persistent Athlete Profile
   const [profile, setProfile] = useState<AthleteProfile>(() => {
     try {
@@ -169,8 +173,71 @@ export default function App() {
     };
   }, [user]);
 
-  // Consistency Streak Calculation
-  const streakDays = Math.max(3, activeTodos.filter((t) => t.completed).length + 2);
+  // Synchronize activeTab with URL hash (#journal, #habits, #chat, #profile)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['journal', 'habits', 'chat', 'profile'].includes(hash)) {
+        setActiveTab(hash as any);
+      }
+    };
+
+    if (window.location.hash) {
+      handleHashChange();
+    }
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleTabChange = (tab: 'journal' | 'habits' | 'chat' | 'profile') => {
+    setActiveTab(tab);
+    window.location.hash = tab;
+  };
+
+  // True Consecutive Calendar Days Streak Calculation
+  const streakDays = useMemo(() => {
+    if (!journalEntries || journalEntries.length === 0) return 0;
+    const dates = Array.from(new Set(journalEntries.map((e) => e.date))).sort().reverse();
+    if (dates.length === 0) return 0;
+
+    let streak = 0;
+    let checkDate = new Date(dates[0]);
+    for (const d of dates) {
+      const entryD = new Date(d);
+      const delta = Math.round((checkDate.getTime() - entryD.getTime()) / (1000 * 60 * 60 * 24));
+      if (delta === 0) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else if (delta === 1) {
+        streak++;
+        checkDate = new Date(entryD);
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return Math.max(1, streak);
+  }, [journalEntries]);
+
+  // Delete past journal entry
+  const handleDeleteJournalEntry = (id: string) => {
+    setJournalEntries((prev) => prev.filter((e) => e.id !== id));
+    if (user) {
+      firestoreService.deleteJournalEntry(user.uid, id).catch(console.error);
+    }
+  };
+
+  // Clear completed habits
+  const handleClearCompletedHabits = () => {
+    const completedIds = activeTodos.filter((t) => t.completed).map((t) => t.id);
+    setActiveTodos((prev) => prev.filter((t) => !t.completed));
+    if (user) {
+      completedIds.forEach((id) => {
+        firestoreService.deleteHabit(user.uid, id).catch(console.error);
+      });
+    }
+  };
 
   // Toggle Language Handler
   const handleToggleLanguage = () => {
@@ -462,16 +529,35 @@ export default function App() {
     ]);
   };
 
+  // Render Landing Page for first-time visitors who haven't logged in or entered guest mode
+  if (!authLoading && !user && !isGuestMode) {
+    return (
+      <LandingPage
+        onSignIn={signIn}
+        onContinueAsGuest={() => {
+          setIsGuestMode(true);
+          localStorage.setItem('aurafit_guest_mode', 'true');
+        }}
+        profile={profile}
+        onToggleLanguage={handleToggleLanguage}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#05070A] text-slate-200 flex flex-col selection:bg-cyan-500 selection:text-slate-950 font-sans">
       {/* Navigation Header */}
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         profile={profile}
         activeTodos={activeTodos}
         streakDays={streakDays}
         onToggleLanguage={handleToggleLanguage}
+        onOpenLanding={() => {
+          setIsGuestMode(false);
+          localStorage.removeItem('aurafit_guest_mode');
+        }}
       />
 
       {/* Main Body */}
@@ -509,7 +595,7 @@ export default function App() {
                 </div>
                 <button
                   id="go-to-habits-banner-btn"
-                  onClick={() => setActiveTab('habits')}
+                  onClick={() => handleTabChange('habits')}
                   className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all cursor-pointer"
                 >
                   <span>{profile.preferredLanguage === 'my' ? 'Habits စာရင်း ကြည့်မည်' : 'View In Habits Tab'} ({latestEvaluationNotice.habitsCount})</span>
@@ -525,7 +611,7 @@ export default function App() {
                   profile={profile}
                   onAdoptHabits={handleAdoptHabits}
                   habitsAdopted={habitsAdopted}
-                  onViewHabits={() => setActiveTab('habits')}
+                  onViewHabits={() => handleTabChange('habits')}
                 />
               </div>
             )}
@@ -539,6 +625,7 @@ export default function App() {
             onToggleTodo={handleToggleTodo}
             onAddCustomTodo={handleAddCustomTodo}
             onDeleteTodo={handleDeleteTodo}
+            onClearCompleted={handleClearCompletedHabits}
             profile={profile}
             streakDays={streakDays}
           />
@@ -563,6 +650,7 @@ export default function App() {
             profile={profile}
             onUpdateProfile={handleUpdateProfile}
             journalEntries={journalEntries}
+            onDeleteEntry={handleDeleteJournalEntry}
           />
         )}
       </main>

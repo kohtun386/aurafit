@@ -32,14 +32,35 @@ AuraFit Coach empowers athletes, gym-goers, and fitness enthusiasts to balance i
 
 ## 🔒 Security & Data Isolation (Firestore Rules)
 
-User data is strictly isolated to prevent cross-user leakage. Each athlete only has read/write permissions for their own documents:
+User data is strictly isolated to prevent cross-user leakage with document ownership enforcement and payload size guards:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // User Profile Document
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Subcollections: Journal Entries, Actionable Habits, Chat Messages
+      match /journalEntries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /habits/{habitId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /chatMessages/{messageId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

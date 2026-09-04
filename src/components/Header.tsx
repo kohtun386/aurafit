@@ -11,6 +11,7 @@ interface HeaderProps {
   activeTodos: ActionableTodo[];
   streakDays: number;
   onToggleLanguage: () => void;
+  onOpenLanding?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTodos,
   streakDays,
   onToggleLanguage,
+  onOpenLanding,
 }) => {
   const { user, signIn, signOut, loading: authLoading, isFirebaseConnected } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -44,13 +46,17 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {/* Logo & Identity matching Immersive UI */}
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.5)] shrink-0">
+          <div 
+            onClick={onOpenLanding}
+            className={`flex items-center gap-3.5 ${onOpenLanding ? 'cursor-pointer group' : ''}`}
+            title={onOpenLanding ? 'View AuraFit Overview & Landing' : undefined}
+          >
+            <div className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.5)] shrink-0 group-hover:scale-105 transition-transform">
               <div className="w-4 h-4 border-2 border-white rounded-sm rotate-45" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white uppercase">
+                <h1 className="text-xl font-bold tracking-tight text-white uppercase font-sans">
                   AuraFit <span className="text-cyan-400">Coach</span>
                 </h1>
                 <span className="text-[10px] text-cyan-400 font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">

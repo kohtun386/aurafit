@@ -22,6 +22,7 @@ interface ActionableHabitsTrackerProps {
   onToggleTodo: (id: string) => void;
   onAddCustomTodo: (todo: Omit<ActionableTodo, 'id' | 'completed'>) => void;
   onDeleteTodo: (id: string) => void;
+  onClearCompleted?: () => void;
   profile: AthleteProfile;
   streakDays: number;
 }
@@ -31,6 +32,7 @@ export const ActionableHabitsTracker: React.FC<ActionableHabitsTrackerProps> = (
   onToggleTodo,
   onAddCustomTodo,
   onDeleteTodo,
+  onClearCompleted,
   profile,
   streakDays,
 }) => {
@@ -133,6 +135,19 @@ export const ActionableHabitsTracker: React.FC<ActionableHabitsTrackerProps> = (
               <Flame className="h-4 w-4 fill-amber-400/20" />
               <span>{streakDays} {lang === 'my' ? 'ရက် စွဲမြဲမှု' : 'Days Consistency'}</span>
             </div>
+
+            {completedCount > 0 && onClearCompleted && (
+              <button
+                id="clear-completed-habits-btn"
+                onClick={onClearCompleted}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-red-400 border border-slate-800 text-xs font-mono transition-colors cursor-pointer"
+                title="Clear all completed habits"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{lang === 'my' ? 'ပြီးစီးသည်များ ဖျက်မည်' : 'Clear Completed'}</span>
+                <span>({completedCount})</span>
+              </button>
+            )}
 
             <button
               id="add-custom-habit-btn"
