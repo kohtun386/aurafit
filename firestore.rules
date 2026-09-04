@@ -1,106 +1,51 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Global Safety Net: Default Deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Helper functions
-    function isSignedIn() {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
-
+    
+    // Helper function to check if user owns the document
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    // Profiles Collection
+    match /users/{userId}/profile/{docId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+    }
+    
+    // Workout Journal Collection
+    match /users/{userId}/journal/{docId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
-    function incoming() {
-      return request.resource.data;
+    // Daily Recovery Habits Collection
+    match /users/{userId}/habits/{docId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
-    function existing() {
-      return resource.data;
+    // AI Coaching Sessions / Chat History Collection
+    match /users/{userId}/chatHistory/{docId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
-    // User Profile Validation
-    function isValidUserProfile(data, userId) {
-      return data.userId == userId &&
-        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-        data.primaryGoal is string && data.primaryGoal.size() <= 50 &&
-        data.trainingExperience is string && data.trainingExperience.size() <= 50 &&
-        data.bodyWeightKg is number && data.bodyWeightKg > 0 && data.bodyWeightKg <= 500 &&
-        data.sportOrDiscipline is string && data.sportOrDiscipline.size() <= 100 &&
-        data.preferredLanguage in ['en', 'my'];
-    }
-
-    // Journal Entry Validation
-    function isValidJournalEntry(data, userId) {
-      return data.userId == userId &&
-        data.id is string && data.id.size() <= 128 &&
-        data.date is string && data.date.size() <= 32 &&
-        data.workoutType is string && data.workoutType.size() <= 100 &&
-        data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1440 &&
-        data.rpe is number && data.rpe >= 1 && data.rpe <= 10 &&
-        data.sleepHours is number && data.sleepHours >= 0 && data.sleepHours <= 24 &&
-        data.sleepQuality is string && data.sleepQuality.size() <= 30 &&
-        data.sorenessLevel is number && data.sorenessLevel >= 1 && data.sorenessLevel <= 5;
-    }
-
-    // Recovery Habit Validation
-    function isValidRecoveryHabit(data, userId) {
-      return data.userId == userId &&
-        data.id is string && data.id.size() <= 128 &&
-        data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
-        data.category is string && data.category.size() <= 50 &&
-        data.specifics is string && data.specifics.size() <= 500 &&
-        data.timing is string && data.timing.size() <= 50 &&
-        data.completed is bool;
-    }
-
-    // Chat Message Validation
-    function isValidChatMessage(data, userId) {
-      return data.userId == userId &&
-        data.id is string && data.id.size() <= 128 &&
-        data.role in ['user', 'assistant'] &&
-        data.content is string && data.content.size() > 0 && data.content.size() <= 4000 &&
-        data.timestamp is string && data.timestamp.size() <= 64;
-    }
-
-    // Users Collection Root & Subcollections
-    match /users/{userId} {
-      allow get: if isOwner(userId) && isValidId(userId);
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming(), userId);
-      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming(), userId) && incoming().userId == existing().userId;
-      allow delete: if isOwner(userId) && isValidId(userId);
-
-      // Journal Entries Subcollection
-      match /journalEntries/{entryId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(entryId) && isValidJournalEntry(incoming(), userId);
-        allow update: if isOwner(userId) && isValidId(entryId) && isValidJournalEntry(incoming(), userId) && incoming().userId == existing().userId;
-        allow delete: if isOwner(userId) && isValidId(entryId);
-      }
-
-      // Actionable Habits Subcollection
-      match /habits/{habitId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(habitId) && isValidRecoveryHabit(incoming(), userId);
-        allow update: if isOwner(userId) && isValidId(habitId) && isValidRecoveryHabit(incoming(), userId) && incoming().userId == existing().userId;
-        allow delete: if isOwner(userId) && isValidId(habitId);
-      }
-
-      // Chat Messages Subcollection
-      match /chatMessages/{messageId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(messageId) && isValidChatMessage(incoming(), userId);
-        allow update: if isOwner(userId) && isValidId(messageId) && isValidChatMessage(incoming(), userId) && incoming().userId == existing().userId;
-        allow delete: if isOwner(userId) && isValidId(messageId);
-      }
+    // Default deny for all other unmatched documents
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
